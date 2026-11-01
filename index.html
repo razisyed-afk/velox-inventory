@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Velox Inventory | Cyber-Glass Smart Stock & Profit System</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+  <style>
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+
+    /* Cyber-Glass Style Effects */
+    .glass-card {
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .glass-card-hover {
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .glass-card-hover:hover {
+      transform: translateY(-2px);
+      border-color: rgba(59, 130, 246, 0.4);
+      box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.15);
+    }
+
+    /* Pulse Glow Animation for Low Stock Alert */
+    @keyframes redPulse {
+      0%, 100% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+      }
+      50% {
+        box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
+      }
+    }
+    .badge-red-pulse {
+      animation: redPulse 2s infinite;
+    }
+
+    /* Canvas Background Positioning */
+    #particle-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 0;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen relative overflow-x-hidden">
+
+  <!-- Interactive Animated Background Canvas -->
+  <canvas id="particle-canvas"></canvas>
+
+  <!-- Main App Layout Container -->
+  <div class="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    
+    <!-- Top Header Bar -->
+    <header class="glass-card rounded-2xl p-6 flex flex-col md:flex-row justify-between items-center gap-4 shadow-2xl">
+      <div class="flex items-center space-x-4">
+        <div class="w-12 h-12 rounded-xl bg-gradient-to-tr from-blue-600 to-cyan-400 flex items-center justify-center text-2xl font-bold shadow-lg shadow-blue-500/30">
+          <i class="fa-solid font-bold fa-bolt text-white"></i>
+        </div>
+        <div>
+          <h1 class="text-2xl font-extrabold tracking-tight bg-gradient-to-r from-blue-400 via-cyan-300 to-indigo-400 bg-clip-text text-transparent">
+            Velox Inventory
+          </h1>
+          <p class="text-xs text-slate-400">Smart Stock Control & Real-time Profit Analytics</p>
+        </div>
+      </div>
+      
+      <!-- System Badges & Quick CSV Actions -->
+      <div class="flex items-center gap-3">
+        <button onclick="exportToCSV()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-medium transition border border-slate-700 flex items-center gap-2">
+          <i class="fa-solid fa-file-csv text-emerald-400"></i> Export CSV
+        </button>
+        <button onclick="seedSampleData()" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium transition shadow-lg shadow-blue-600/30 flex items-center gap-2">
+          <i class="fa-solid fa-database"></i> Load Demo Data
+        </button>
+      </div>
+    </header>
+
+    <!-- Metrics Dashboard Widgets -->
+    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      
+      <!-- Total Products Widget -->
+      <div class="glass-card glass-card-hover p-5 rounded-2xl border border-slate-800">
+        <div class="flex justify-between items-start">
+          <div>
+            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Products</p>
+            <h3 id="stat-total-items" class="text-3xl font-bold text-slate-100 mt-2">0</h3>
+          </div>
+          <div class="p-3 bg-blue-500/10 text-blue-400 rounded-xl">
+            <i class="fa-solid fa-boxes-stacked text-xl"></i>
+          </div>
+        </div>
+      </div>
+
+      <!-- Total Estimated Revenue Widget -->
+      <div class="glass-card glass-card-hover p-5 rounded-2xl border border-slate-800">
+        <div class="flex justify-between items-start">
+          <div>
+            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Potential Revenue</p>
+            <h3 id="stat-total-revenue" class="text-3xl font-bold text-emerald-400 mt-2">$0.00</h3>
+          </div>
+          <div class="p-3 bg-emerald-500/10 text-emerald-400 rounded-xl">
+            <i class="fa-solid fa-chart-line text-xl"></i>
+          </div>
+        </div>
+      </div>
+
+      <!-- Expected Net Profit Widget -->
+      <div class="glass-card glass-card-hover p-5 rounded-2xl border border-slate-800">
+        <div class="flex justify-between items-start">
+          <div>
+            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Estimated Profit</p>
+            <h3 id="stat-total-profit" class="text-3xl font-bold text-cyan-400 mt-2">$0.00</h3>
+          </div>
+          <div class="p-3 bg-cyan-500/10 text-cyan-400 rounded-xl">
+            <i class="fa-solid fa-sack-dollar text-xl"></i>
+          </div>
+        </div>
+      </div>
+
+      <!-- Red Alerts Count (< 5 Units) -->
+      <div class="glass-card glass-card-hover p-5 rounded-2xl border border-slate-800">
+        <div class="flex justify-between items-start">
+          <div>
+            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Critical Stock Alerts</p>
+            <h3 id="stat-low-stock" class="text-3xl font-bold text-rose-500 mt-2">0</h3>
+          </div>
+          <div class="p-3 bg-rose-500/10 text-rose-400 rounded-xl">
+            <i class="fa-solid fa-triangle-exclamation text-xl"></i>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Main Workspace Section: Product Input Form & Inventory Table -->
+    <main class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      
+      <!-- Left Column: Add / Update Product Form -->
+      <section class="glass-card p-6 rounded-2xl border border-slate-800 h-fit space-y-6">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+          <h2 id="form-title" class="text-lg font-bold text-slate-100 flex items-center gap-2">
+            <i class="fa-solid fa-plus-circle text-blue-400"></i> Add New Product
+          </h2>
+          <span id="edit-badge" class="hidden px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">Editing</span>
+        </div>
+
+        <form id="product-form" class="space-y-4">
+          <input type="hidden" id="product-id" />
+
+          <!-- Product Name Field -->
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1">Product Name</label>
+            <input type="text" id="p-name" required placeholder="e.g. Wireless Gaming Mouse" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:border-blue-500 transition" />
+          </div>
+
+          <!-- Category Field -->
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1">Category</label>
+            <input type="text" id="p-category" required placeholder="e.g. Electronics, Peripherals" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:border-blue-500 transition" />
+          </div>
+
+          <!-- Quantity & Expiry Date Side-by-Side -->
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-medium text-slate-300 mb-1">Quantity</label>
+              <input type="number" id="p-qty" min="0" required placeholder="10" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:border-blue-500 transition" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-300 mb-1">Expiry Date</label>
+              <input type="date" id="p-expiry" required class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:border-blue-500 transition" />
+            </div>
+          </div>
+
+          <!-- Cost Price & Selling Price Side-by-Side -->
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-medium text-slate-300 mb-1">Cost Price ($)</label>
+              <input type="number" step="0.01" min="0" id="p-cost" required placeholder="25.00" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:border-blue-500 transition" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-300 mb-1">Selling Price ($)</label>
+              <input type="number" step="0.01" min="0" id="p-price" required placeholder="49.99" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:border-blue-500 transition" />
+            </div>
+          </div>
+
+          <!-- Action Submit Buttons -->
+          <div class="pt-2 flex gap-3">
+            <button type="submit" id="btn-submit" class="flex-1 py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm transition shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2">
+              <i class="fa-solid fa-check"></i> Save Product
+            </button>
+            <button type="button" id="btn-cancel" onclick="resetForm()" class="hidden py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-sm transition border border-slate-700">
+              Cancel
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <!-- Right Column: Live Inventory Table -->
+      <section class="lg:col-span-2 glass-card p-6 rounded-2xl border border-slate-800 space-y-4">
+        
+        <!-- Table Search & Filters -->
+        <div class="flex flex-col sm:flex-row gap-4 justify-between items-center">
+          <div class="relative w-full sm:w-72">
+            <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-500 text-sm"></i>
+            <input type="text" id="search-input" oninput="renderTable()" placeholder="Search item or category..." class="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:border-blue-500 transition" />
+          </div>
+          
+          <div class="text-xs text-slate-400 flex gap-4">
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span> Stock &lt; 5</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Expiry &le; 10 Days</span>
+          </div>
+        </div>
+
+        <!-- Scrollable Table Wrapper -->
+        <div class="overflow-x-auto rounded-xl border border-slate-800">
+          <table class="w-full text-left text-sm text-slate-300">
+            <thead class="bg-slate-900/80 text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-800">
+              <tr>
+                <th class="p-3.5">Product</th>
+                <th class="p-3.5">Qty</th>
+                <th class="p-3.5">Cost / Price</th>
+                <th class="p-3.5">Profit / Unit</th>
+                <th class="p-3.5">Expiry</th>
+                <th class="p-3.5 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="inventory-tbody" class="divide-y divide-slate-800/60 bg-slate-950/40">
+              <!-- JS Injected Row Items Here -->
+            </tbody>
+          </table>
+        </div>
+
+      </section>
+    </main>
+
+  </div>
+
+  <!-- JavaScript Application Logic -->
+  <script>
+    /* ==========================================================================
+       1. DATA STORAGE & INITIAL STATE
+       ========================================================================== */
+    let inventory = JSON.parse(localStorage.getItem('velox_inventory_db')) || [];
+
+    /* ==========================================================================
+       2. CANVAS PARTICLE ANIMATION ENGINE
+       ========================================================================== */
+    const canvas = document.getElementById('particle-canvas');
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+
+    function resizeCanvas
